@@ -78,21 +78,29 @@ class SignalMgr:
             features = self.intercept_mgr.generate_features(_data) or {}
             is_intercept = self.intercept_mgr.intercept_signal(features)
 
+            features_and_target = []
             for signal_id in list(self.check_signals.keys()):
-                signal, features, is_intercept = self.check_signals[signal_id]
+                signal, signal_features, signal_intercept = self.check_signals[signal_id]
                 target = self.intercept_mgr.generate_target(signal_id, signal, _data)
                 if target is None:
                     continue
-                
+
+                features_and_target.append({'features': signal_features, 'target': target})
                 self.check_signals.pop(signal_id)
-                self.signals.append({**signal, **features, **target, 'intercept': is_intercept})
+                self.signals.append({**signal, **features, **target, 'intercept': signal_intercept})
+
+            if features_and_target:
+                self.intercept_mgr.generate_model(features_and_target)
 
         signals = self.signal_mgr.generate_signals(_data) or []
         for signal in signals:
-            self.check_fields(signal)
             signal.update({'signal_timestamp': _signal_ts, 'signal_price': _signal_price})
-            self.check_signals[self.signal_id] = [signal, features, is_intercept]
-            self.signal_id += 1
+            if self.intercept_mgr is None:
+                self.signals.append(signal)
+            else:
+                self.check_fields(signal)
+                self.check_signals[self.signal_id] = [signal, features, is_intercept]
+                self.signal_id += 1
 
         return signals
 
