@@ -7,47 +7,62 @@
 import importlib
 
 from algoUtils.reloadUtil import reload_all
-from .dataMgr import DataMgr
+
+from algoUtils.schemaUtil import PerformanceMgrParam, Performance, EntryInfo, ExitInfo
+from typing import Optional, Dict, List
 
 
 class PerformanceMgr:
 
-    def __init__(self, _performance_method_name, _performance_method_param, _data_mgr):
-        self.performance_mgr = self.get_performance_method(_performance_method_name, _performance_method_param)
-        self.data_mgr: DataMgr = _data_mgr
+    def __init__(self, _performance_info: Optional[PerformanceMgrParam]):
+        self.performance_info = _performance_info
+        self.performance_mgr = self.get_performance_method(_performance_info)
+        self.entry_info: Optional[EntryInfo] = None
+        self.exit_info: Optional[ExitInfo] = None
 
     @staticmethod
-    def get_performance_method(_method_name, _method_param):
-        if _method_param is None:
-            _method_param = {}
-        module = importlib.import_module('algoStrategy.algoPerformances.{}'.format(_method_name))
+    def get_performance_method(_method_info: Optional[PerformanceMgrParam]):
+        if _method_info is None:
+            return
+        
+        module = importlib.import_module('algoStrategy.algoPerformances.{}'.format(_method_info.performance_method_name))
         reload_all(module)
         cls_method = getattr(module, 'Algo')
         if cls_method is None:
-            raise Exception('Unknown Method: {}'.format(_method_name))
-        instance = cls_method(**_method_param)
+            raise Exception('Unknown Method: {}'.format(_method_info.performance_method_name))
+        
+        instance = cls_method(**_method_info.performance_method_param)
         return instance
 
-    @classmethod
-    async def generate_abstract(cls, _performances, _abstract_method, _abstract_param):
-        if _abstract_param is None:
-            _abstract_param = {}
-        module = importlib.import_module('algoStrategy.algoAbstracts.{}'.format(_abstract_method))
-        reload_all(module)
-        cls_method = getattr(module, 'Algo')
-        if cls_method is None:
-            raise Exception('Unknown Method: {}'.format(_abstract_method))
-        instance = cls_method(**_abstract_param)
-        return instance.generate_abstract(_performances)
+    def generate_performance(self) -> Optional[Performance]:
+        if self.entry_info.entry_direction == 'long':
+            is_win = self.exit_info.exit_price > self.entry_info.entry_price
+            trade_ret = self.exit_info.exit_price / self.entry_info.entry_price - 1
+            trade_ret -= self.performance_info.entry_fee + self.performance_info.exit_fee
+        else:
+            is_win = self.exit_info.exit_price < self.entry_info.entry_price
+            trade_ret = self.entry_info.entry_price / self.exit_info.exit_price - 1
+            trade_ret -= self.performance_info.entry_fee + self.performance_info.exit_fee
 
-    async def start_task(self, _signal, _keep_empty: bool):
-        self.data_mgr.clear_cache_data(_signal['symbol'], _signal['signal_timestamp'])
-        if isinstance(_signal['signal_price'], str):
-            _signal['signal_price'] = eval(_signal['signal_price'])
+        return Performance(
+            success=True,
+            is_win=is_win,
+            trade_ret=trade_ret,
+            trade_duration=self.exit_info.exit_timestamp - self.entry_info.entry_timestamp
+        )
 
-        performance = await self.performance_mgr.generate_performances(_signal, self.data_mgr) or {}
-        if not performance and not _keep_empty:
+    def update_performance(self, _data: Dict[str, List[List]]) -> Optional[Performance]:
+        if self.performance_mgr is None:
             return
+        
+        if self.entry_info is None:
+            self.entry_info = self.performance_mgr.generate_entry_info(_data)
+        
+        if self.entry_info is not None:
+            if self.entry_info.entry_success is True:
+                self.exit_info = self.performance_mgr.generate_exit_info(_data)
+                if self.exit_info is not None:
+                    return self.generate_performance()
 
-        adj_performance = {'performance_{}'.format(k): v for k, v in performance.items()}
-        return {**_signal, **adj_performance}
+            else:
+                return Performance(success=False)

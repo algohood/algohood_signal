@@ -5,7 +5,7 @@
 @Author: Jijingyuan
 """
 import importlib
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Dict
 from algoUtils.reloadUtil import reload_all
 from algoUtils.baseUtil import SignalBase
 from algoUtils.schemaUtil import FeatureMgrParam
@@ -35,13 +35,20 @@ class FeatureMgr:
         instance = cls_method(**_method_info.feature_method_param)
         return instance
     
-    def update_features(self, _data) -> dict:
+    def update_features(self, _data: Dict[str, List[List]]) -> dict:
+        for _, feature_mgr in self.feature_mgrs.items():
+            if feature_mgr is None:
+                continue
+            
+            feature_mgr.update_state(_data)
+
+    def generate_features(self, _data: Dict[str, List[List]]) -> dict:
         features = {}
-        for feature_name, feature_mgr in self.feature_mgrs.items():
+        for _, feature_mgr in self.feature_mgrs.items():
             if feature_mgr is None:
                 continue
             
             feature_dict = feature_mgr.generate_features(_data) or {}
-            features.update({'{}_{}'.format(feature_name, k): v for k, v in feature_dict.items()})
-            
+            features.update(feature_dict)
+
         return features
