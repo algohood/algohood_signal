@@ -121,9 +121,9 @@ class DataMgr:
         last_ts = float('inf')
         for tmp in _cluster_rsp.values():
             for info in zip(*[list(v.values())[0][1] for v in tmp]):
-                rank_ts = round(info[0][0] / 1000000, 6)
-                delay = round((info[0][0] - info[3][1]) / 1000000, 6)
-                all_data.append([rank_ts, delay, info[1][1], info[0][1], int(info[2][1])])
+                recv_ts = round(info[0][0] / 1000000, 6)
+                exchange_ts = round(info[3][1] / 1000000, 6)
+                all_data.append([recv_ts, exchange_ts, info[1][1], info[0][1], int(info[2][1])])
 
             if all_data:
                 last_ts = min(last_ts, all_data[-1][0])
