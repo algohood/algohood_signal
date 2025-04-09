@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = { find = {} }
+
+[project]
+name = "algoSignal"
+version = "0.1"
+authors = [
+    { name="Jijingyuan", email="jijingyuan@algohood.com" },
+]
+description = "research tools for signal analyzing in quantitative trading"
+requires-python = ">=3.10"
