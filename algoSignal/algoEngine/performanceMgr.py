@@ -37,14 +37,6 @@ class PerformanceMgr:
         instance.init_signal(_signal)
         return instance
     
-    def init_signals(self, _symbols: List[str], _start_timestamp: float, _end_timestamp: float, _signals: List[Signal]):
-        logger.info('start init signals')
-        self.symbols = _symbols
-        self.start_timestamp = _start_timestamp
-        self.end_timestamp = _end_timestamp
-        _signals.sort(key=lambda x: x.timestamp, reverse=True)
-        self.performance_q = [(signal, self.get_performance_method(signal)) for signal in _signals]
-
     def generate_performance(self, _data: Dict[str, np.ndarray]) -> Optional[Union[float, str]]:
         last_data_ts = max([v[-1, 0] for v in _data.values()])
         total_len = len(self.performance_q)
@@ -69,7 +61,14 @@ class PerformanceMgr:
 
         return last_signal.timestamp
 
-    async def start_task(self, _generate_abstract=True):
+    async def start_task(self, _symbols: List[str], _start_timestamp: float, _end_timestamp: float, _signals: List[Signal], _generate_abstract=True):
+        logger.info('start init signals')
+        self.symbols = _symbols
+        self.start_timestamp = _start_timestamp
+        self.end_timestamp = _end_timestamp
+        _signals.sort(key=lambda x: x.timestamp, reverse=True)
+        self.performance_q = [(signal, self.get_performance_method(signal)) for signal in _signals]
+
         logger.info('start generate performances')
         t0 = time.time()
         profile_stats.reset()
