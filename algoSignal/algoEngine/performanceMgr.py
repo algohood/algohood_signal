@@ -26,20 +26,24 @@ class PerformanceMgr:
         self.performance_q = []
         self.trade_result_q = []
 
-    def get_performance_method(self, _signal: Signal) -> PerformanceBase:
+    def get_performance_method(self):
         module = importlib.import_module('algoStrategy.algoPerformances.{}'.format(self.performance_info.performance_method_name))
         reload_all(module)
         cls_method = getattr(module, 'Algo')
         if cls_method is None:
             raise Exception('Unknown Method: {}'.format(self.performance_info.performance_method_name))
-        
-        instance = cls_method(**self.performance_info.performance_method_param)
+
+        return cls_method
+    
+    def init_method(self, _method, _signal: Signal) -> PerformanceBase:
+        instance = _method(**self.performance_info.performance_method_param)
         instance.init_signal(_signal)
         return instance
     
     def generate_performance(self, _data: Dict[str, np.ndarray]) -> Optional[Union[float, str]]:
         last_data_ts = max([v[-1, 0] for v in _data.values()])
         total_len = len(self.performance_q)
+        t1 = time.time()
         for i in range(total_len - 1, -1, -1):
             signal, performance = self.performance_q[i]
             if signal.timestamp > last_data_ts:
@@ -67,7 +71,8 @@ class PerformanceMgr:
         self.start_timestamp = _start_timestamp
         self.end_timestamp = _end_timestamp
         _signals.sort(key=lambda x: x.timestamp, reverse=True)
-        self.performance_q = [(signal, self.get_performance_method(signal)) for signal in _signals]
+        method = self.get_performance_method()
+        self.performance_q = [(signal, self.init_method(method, signal)) for signal in _signals]
 
         logger.info('start generate performances')
         t0 = time.time()
