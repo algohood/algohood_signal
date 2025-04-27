@@ -390,7 +390,7 @@ class PerformanceMgr:
             'best_win_rate': max_return_win_rate,
             'best_profit_loss_ratio': max_return_profit_loss_ratio,
             'best_max_drawdown': max_return_max_drawdown,
-            'best_ret_per_mdd': historical_max_return / max_return_max_drawdown,
+            'best_ret_per_mdd': historical_max_return / max_return_max_drawdown if max_return_max_drawdown > 0 else 0,
             
             # 第三部分：前20%最好的交易时间段表现
             'top20_return': top20_return,
