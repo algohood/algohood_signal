@@ -61,40 +61,41 @@ class EventMgr:
 
     @staticmethod
     @profile_stats.update_cost_time
-    def reshape(_ticks_dict: Dict[str, np.ndarray], _lag):
-        keep = len(str(_lag).split('.')[-1]) if _lag < 1 else 0
+    def reshape(_ticks_dict: Dict[str, np.ndarray], _lag) -> Dict[float, Dict[str, np.ndarray]]:
+        # 预先创建结果字典
         result = {}
         
-        # 提前计算舍入因子，避免在循环中重复计算
+        # 直接计算保留小数位数
+        keep = 6  # 因为时间戳保留六位小数
         round_factor = 10 ** keep
         
         # 处理每个symbol的数据
         for symbol, ticks in _ticks_dict.items():
-            # 向量化计算分组键
+            if len(ticks) == 0:
+                continue
+            
+            # 提取时间戳列
             timestamps = ticks[:, 0]
             
-            # 优化分组键计算，减少中间步骤
+            # 向量化计算分组键 - 这里使用更高效的向量化操作
             group_keys = np.ceil(timestamps / _lag) * _lag
-            if keep > 0:
-                group_keys = np.round(group_keys * round_factor) / round_factor
-                
-            # 使用NumPy的argsort和groupby进行更高效的分组
-            sorted_indices = np.argsort(group_keys)
-            sorted_keys = group_keys[sorted_indices]
-            sorted_ticks = ticks[sorted_indices]
+            # 确保保留六位小数
+            group_keys = np.round(group_keys * round_factor) / round_factor
             
-            # 找出组的边界
-            key_changes = np.concatenate(([True], sorted_keys[1:] != sorted_keys[:-1], [True]))
-            group_indices = np.flatnonzero(key_changes)
+            # 找出唯一键的变化位置
+            changes = np.where(np.diff(np.append(group_keys, [np.inf])))[0]
             
-            # 按组添加到结果字典
-            for i in range(len(group_indices) - 1):
-                start, end = group_indices[i], group_indices[i+1]
-                key = float(sorted_keys[start])  # 只执行一次float转换
+            # 一次性处理所有切片
+            start_idx = 0
+            for end_idx in changes:
+                key = float(group_keys[start_idx])
+                # 使用字典的setdefault避免重复检查
                 batch = result.setdefault(key, {})
-                batch[symbol] = sorted_ticks[start:end]
+                batch[symbol] = ticks[start_idx:end_idx+1]
+                start_idx = end_idx + 1
         
-        return result
+        # 返回按键排序的结果
+        return {k: result[k] for k in sorted(result)}
 
     @profile_stats.update_cost_time
     def handle_batch_data(self, _current_ts: float, _data: Dict[str, np.ndarray]):
